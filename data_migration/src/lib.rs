@@ -2290,4 +2290,327 @@ mod tests {
         let result = import_from_binary_untracked(&bytes);
         assert_eq!(result.unwrap_err(), MigrationError::ChecksumMismatch);
     }
+
+    #[test]
+    fn test_csv_roundtrip_with_commas_in_names() {
+        let payload = SavingsGoalsExport {
+            next_id: 2,
+            goals: vec![
+                SavingsGoalExport {
+                    id: 1,
+                    owner: "owner1".into(),
+                    name: "Goal, with, commas".into(),
+                    target_amount: 1_000,
+                    current_amount: 500,
+                    target_date: 2_000_000_000,
+                    locked: false,
+                },
+                SavingsGoalExport {
+                    id: 2,
+                    owner: "owner,2".into(),
+                    name: "Normal Goal".into(),
+                    target_amount: 2_000,
+                    current_amount: 1_500,
+                    target_date: 2_000_000_001,
+                    locked: true,
+                },
+            ],
+        };
+
+        let exported_bytes = export_to_csv(&payload).unwrap();
+        let imported_goals = import_goals_from_csv(&exported_bytes).unwrap();
+
+        assert_eq!(imported_goals.len(), 2);
+        assert_eq!(imported_goals[0].name, "Goal, with, commas");
+        assert_eq!(imported_goals[1].owner, "owner,2");
+    }
+
+    #[test]
+    fn test_csv_roundtrip_with_quotes_in_names() {
+        let payload = SavingsGoalsExport {
+            next_id: 2,
+            goals: vec![
+                SavingsGoalExport {
+                    id: 1,
+                    owner: "owner1".into(),
+                    name: "Goal \"quoted\" text".into(),
+                    target_amount: 1_000,
+                    current_amount: 500,
+                    target_date: 2_000_000_000,
+                    locked: false,
+                },
+                SavingsGoalExport {
+                    id: 2,
+                    owner: "owner\"2".into(),
+                    name: "Normal Goal".into(),
+                    target_amount: 2_000,
+                    current_amount: 1_500,
+                    target_date: 2_000_000_001,
+                    locked: true,
+                },
+            ],
+        };
+
+        let exported_bytes = export_to_csv(&payload).unwrap();
+        let imported_goals = import_goals_from_csv(&exported_bytes).unwrap();
+
+        assert_eq!(imported_goals.len(), 2);
+        assert_eq!(imported_goals[0].name, "Goal \"quoted\" text");
+        assert_eq!(imported_goals[1].owner, "owner\"2");
+    }
+
+    #[test]
+    fn test_csv_roundtrip_with_newlines_in_names() {
+        let payload = SavingsGoalsExport {
+            next_id: 1,
+            goals: vec![SavingsGoalExport {
+                id: 1,
+                owner: "owner1".into(),
+                name: "Goal\nwith\nnewlines".into(),
+                target_amount: 1_000,
+                current_amount: 500,
+                target_date: 2_000_000_000,
+                locked: false,
+            }],
+        };
+
+        let exported_bytes = export_to_csv(&payload).unwrap();
+        let imported_goals = import_goals_from_csv(&exported_bytes).unwrap();
+
+        assert_eq!(imported_goals.len(), 1);
+        assert_eq!(imported_goals[0].name, "Goal\nwith\nnewlines");
+    }
+
+    #[test]
+    fn test_csv_roundtrip_with_zero_values() {
+        let payload = SavingsGoalsExport {
+            next_id: 1,
+            goals: vec![SavingsGoalExport {
+                id: 1,
+                owner: "owner1".into(),
+                name: "Zero Goal".into(),
+                target_amount: 0,
+                current_amount: 0,
+                target_date: 0,
+                locked: false,
+            }],
+        };
+
+        let exported_bytes = export_to_csv(&payload).unwrap();
+        let imported_goals = import_goals_from_csv(&exported_bytes).unwrap();
+
+        assert_eq!(imported_goals.len(), 1);
+        assert_eq!(imported_goals[0].target_amount, 0);
+        assert_eq!(imported_goals[0].current_amount, 0);
+        assert_eq!(imported_goals[0].target_date, 0);
+    }
+
+    #[test]
+    fn test_csv_roundtrip_with_negative_amounts() {
+        let payload = SavingsGoalsExport {
+            next_id: 1,
+            goals: vec![SavingsGoalExport {
+                id: 1,
+                owner: "owner1".into(),
+                name: "Negative Goal".into(),
+                target_amount: -1_000,
+                current_amount: -500,
+                target_date: 2_000_000_000,
+                locked: false,
+            }],
+        };
+
+        let exported_bytes = export_to_csv(&payload).unwrap();
+        let imported_goals = import_goals_from_csv(&exported_bytes).unwrap();
+
+        assert_eq!(imported_goals.len(), 1);
+        assert_eq!(imported_goals[0].target_amount, -1_000);
+        assert_eq!(imported_goals[0].current_amount, -500);
+    }
+
+    #[test]
+    fn test_csv_roundtrip_with_large_numbers() {
+        let payload = SavingsGoalsExport {
+            next_id: 1,
+            goals: vec![SavingsGoalExport {
+                id: 1,
+                owner: "owner1".into(),
+                name: "Large Goal".into(),
+                target_amount: i64::MAX,
+                current_amount: i64::MAX - 1,
+                target_date: u64::MAX,
+                locked: false,
+            }],
+        };
+
+        let exported_bytes = export_to_csv(&payload).unwrap();
+        let imported_goals = import_goals_from_csv(&exported_bytes).unwrap();
+
+        assert_eq!(imported_goals.len(), 1);
+        assert_eq!(imported_goals[0].target_amount, i64::MAX);
+        assert_eq!(imported_goals[0].current_amount, i64::MAX - 1);
+        assert_eq!(imported_goals[0].target_date, u64::MAX);
+    }
+
+    #[test]
+    fn test_csv_roundtrip_with_tab_characters() {
+        let payload = SavingsGoalsExport {
+            next_id: 1,
+            goals: vec![SavingsGoalExport {
+                id: 1,
+                owner: "owner\t1".into(),
+                name: "Goal\twith\ttabs".into(),
+                target_amount: 1_000,
+                current_amount: 500,
+                target_date: 2_000_000_000,
+                locked: false,
+            }],
+        };
+
+        let exported_bytes = export_to_csv(&payload).unwrap();
+        let imported_goals = import_goals_from_csv(&exported_bytes).unwrap();
+
+        assert_eq!(imported_goals.len(), 1);
+        assert_eq!(imported_goals[0].owner, "owner\t1");
+        assert_eq!(imported_goals[0].name, "Goal\twith\ttabs");
+    }
+
+    #[test]
+    fn test_csv_roundtrip_with_backslash_characters() {
+        let payload = SavingsGoalsExport {
+            next_id: 1,
+            goals: vec![SavingsGoalExport {
+                id: 1,
+                owner: "owner\\1".into(),
+                name: "Goal\\with\\backslashes".into(),
+                target_amount: 1_000,
+                current_amount: 500,
+                target_date: 2_000_000_000,
+                locked: false,
+            }],
+        };
+
+        let exported_bytes = export_to_csv(&payload).unwrap();
+        let imported_goals = import_goals_from_csv(&exported_bytes).unwrap();
+
+        assert_eq!(imported_goals.len(), 1);
+        assert_eq!(imported_goals[0].owner, "owner\\1");
+        assert_eq!(imported_goals[0].name, "Goal\\with\\backslashes");
+    }
+
+    #[test]
+    fn test_csv_injection_prevention_tab_character_in_owner() {
+        let payload = SavingsGoalsExport {
+            next_id: 1,
+            goals: vec![SavingsGoalExport {
+                id: 1,
+                owner: "\tSUM(A1:A10)".into(),
+                name: "Goal".into(),
+                target_amount: 1_000,
+                current_amount: 100,
+                target_date: 2_000_000_000,
+                locked: false,
+            }],
+        };
+
+        let exported_bytes = export_to_csv(&payload).unwrap();
+        let csv_string = String::from_utf8_lossy(&exported_bytes);
+
+        // Tab is not a formula injection character, so it should not be escaped
+        assert!(csv_string.contains("\tSUM(A1:A10)"), "Tab should not be escaped");
+    }
+
+    #[test]
+    fn test_csv_injection_prevention_backslash_in_name() {
+        let payload = SavingsGoalsExport {
+            next_id: 1,
+            goals: vec![SavingsGoalExport {
+                id: 1,
+                owner: "owner".into(),
+                name: "\\SUM(A1:A10)".into(),
+                target_amount: 1_000,
+                current_amount: 100,
+                target_date: 2_000_000_000,
+                locked: false,
+            }],
+        };
+
+        let exported_bytes = export_to_csv(&payload).unwrap();
+        let csv_string = String::from_utf8_lossy(&exported_bytes);
+
+        // Backslash is not a formula injection character, so it should not be escaped
+        assert!(csv_string.contains("\\SUM(A1:A10)"), "Backslash should not be escaped");
+    }
+
+    #[test]
+    fn test_csv_injection_prevention_pipe_character_in_owner() {
+        let payload = SavingsGoalsExport {
+            next_id: 1,
+            goals: vec![SavingsGoalExport {
+                id: 1,
+                owner: "|SUM(A1:A10)".into(),
+                name: "Goal".into(),
+                target_amount: 1_000,
+                current_amount: 100,
+                target_date: 2_000_000_000,
+                locked: false,
+            }],
+        };
+
+        let exported_bytes = export_to_csv(&payload).unwrap();
+        let csv_string = String::from_utf8_lossy(&exported_bytes);
+
+        // Pipe is not a formula injection character, so it should not be escaped
+        assert!(csv_string.contains("|SUM(A1:A10)"), "Pipe should not be escaped");
+    }
+
+    #[test]
+    fn test_csv_roundtrip_preserves_all_fields() {
+        let payload = SavingsGoalsExport {
+            next_id: 5,
+            goals: vec![
+                SavingsGoalExport {
+                    id: 1,
+                    owner: "owner1".into(),
+                    name: "Goal 1".into(),
+                    target_amount: 10_000,
+                    current_amount: 5_000,
+                    target_date: 1_700_000_000,
+                    locked: false,
+                },
+                SavingsGoalExport {
+                    id: 2,
+                    owner: "owner2".into(),
+                    name: "Goal 2".into(),
+                    target_amount: 20_000,
+                    current_amount: 15_000,
+                    target_date: 1_800_000_000,
+                    locked: true,
+                },
+                SavingsGoalExport {
+                    id: 3,
+                    owner: "owner3".into(),
+                    name: "Goal 3".into(),
+                    target_amount: 30_000,
+                    current_amount: 0,
+                    target_date: 1_900_000_000,
+                    locked: false,
+                },
+            ],
+        };
+
+        let exported_bytes = export_to_csv(&payload).unwrap();
+        let imported_goals = import_goals_from_csv(&exported_bytes).unwrap();
+
+        assert_eq!(imported_goals.len(), 3);
+        for (i, goal) in imported_goals.iter().enumerate() {
+            assert_eq!(goal.id, payload.goals[i].id);
+            assert_eq!(goal.owner, payload.goals[i].owner);
+            assert_eq!(goal.name, payload.goals[i].name);
+            assert_eq!(goal.target_amount, payload.goals[i].target_amount);
+            assert_eq!(goal.current_amount, payload.goals[i].current_amount);
+            assert_eq!(goal.target_date, payload.goals[i].target_date);
+            assert_eq!(goal.locked, payload.goals[i].locked);
+        }
+    }
 }
