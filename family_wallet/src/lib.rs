@@ -1949,7 +1949,7 @@ impl FamilyWallet {
             .get(&symbol_short!("SPND_TRK"))
             .unwrap_or_else(|| Map::new(env));
         let mut tracker = Self::current_spending_tracker(env, proposer);
-        /// Overflow-safe tracker accumulation
+        // Overflow-safe tracker accumulation
         tracker.current_spent = tracker.current_spent.checked_add(amount).unwrap_or(i128::MAX);
         tracker.last_tx_timestamp = env.ledger().timestamp();
         tracker.tx_count = tracker.tx_count.saturating_add(1);
